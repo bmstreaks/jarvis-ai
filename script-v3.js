@@ -420,7 +420,20 @@ async function callLocalAI(userMessage) {
             })
         });
         const data = await response.json();
-        return data.choices[0].message.content;
+        let content = data.choices[0].message.content;
+
+        // --- CLEANUP AI ARTIFACTS ---
+        // 1. Remove <tool_call> blocks
+        content = content.replace(/<tool_call>[\s\S]*?<\/tool_call>/gi, '');
+        // 2. Remove markdown code blocks (often used for JSON)
+        content = content.replace(/```[\s\S]*?```/g, '');
+        // 3. Remove raw JSON-like structures that might be missed
+        content = content.replace(/\{[\s\S]*?"action"[\s\S]*?\}/g, '');
+        // 4. Final trim
+        content = content.trim();
+
+        if (!content) return "I'm sorry sir, the internal logic processor failed to provide a valid response.";
+        return content;
     } catch (e) {
         return "Local intelligence server is currently unreachable, sir.";
     }
