@@ -121,10 +121,12 @@ function init() {
 // VISION & BIOMETRIC GATE
 // ============================================
 
+// Biometric Database
+let subjects = JSON.parse(localStorage.getItem('jarvis_subjects') || '[]');
+
 async function setupVisionSystem() {
     console.log('👁️ Initializing Vision System (MediaPipe)...');
 
-    // Load FaceMesh from global (exposed by CDN)
     faceMesh = new window.FaceMesh({
         locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
@@ -150,7 +152,6 @@ async function setupVisionSystem() {
 }
 
 function onVisionResults(results) {
-    // Resize overlay if needed
     if (faceOverlay.width !== faceVideo.videoWidth) {
         faceOverlay.width = faceVideo.videoWidth;
         faceOverlay.height = faceVideo.videoHeight;
@@ -162,17 +163,31 @@ function onVisionResults(results) {
         lastFaceDetectedTime = Date.now();
         const landmarks = results.multiFaceLandmarks[0];
 
-        // Draw Holographic Mesh
         drawFaceMeshHUD(landmarks);
 
-        // Security Processing if scanning
-        if (securityOverlay.classList.contains('active') && !isSubjectAuthorized) {
+        // Enrollment Capture Trigger
+        if (enrollmentMode === "capturing") {
+            const signature = calculateFaceSignature(landmarks);
+            subjects.push({ name: currentEnrollmentName, signature: signature });
+            localStorage.setItem('jarvis_subjects', JSON.stringify(subjects));
+
+            enrollmentMode = false;
+            currentEnrollmentName = "";
+            document.getElementById('enrollmentForm').style.display = 'none';
+
+            speak(`Biometric profile for ${subjects[subjects.length - 1].name} successfully registered. Access granted.`, true);
+            authorizeSubject(subjects[subjects.length - 1].name);
+            return;
+        }
+
+        if (securityOverlay.classList.contains('active')) {
             processBiometricAuth(landmarks);
         }
     } else {
-        // No face detected
         if (securityOverlay.classList.contains('active')) {
             updateSecurityStatus('LOST SIGNAL', 'PLEASE POSITION FACE WITHIN RETICLE');
+            const label = document.getElementById('subjectLabel');
+            if (label) label.textContent = 'NO SIGNAL';
         }
     }
 }
@@ -182,13 +197,11 @@ function drawFaceMeshHUD(landmarks) {
     faceCtx.strokeStyle = 'rgba(0, 212, 255, 0.4)';
     faceCtx.lineWidth = 1;
 
-    // Draw connecting lines (simplified face mesh look)
     const connectors = window.FACEMESH_TESSELATION;
     if (window.drawConnectors && connectors) {
         window.drawConnectors(faceCtx, landmarks, connectors, { color: '#00d4ff33', lineWidth: 1 });
     }
 
-    // Draw main contours with cyan glow
     const contours = window.FACEMESH_CONTOURS;
     if (window.drawConnectors && contours) {
         window.drawConnectors(faceCtx, landmarks, contours, { color: '#00d4ff', lineWidth: 2 });
@@ -197,32 +210,71 @@ function drawFaceMeshHUD(landmarks) {
     faceCtx.restore();
 }
 
+/**
+ * Generates a scale-invariant biometric signature based on facial ratios
+ */
+function calculateFaceSignature(landmarks) {
+    // We use ratios of distances between key landmarks
+    // e.g. Eye distance / Face width, Nose length / Face height
+    const getDist = (a, b) => Math.sqrt(Math.pow(landmarks[a].x - landmarks[b].x, 2) + Math.pow(landmarks[a].y - landmarks[b].y, 2));
+
+    const faceWidth = getDist(234, 454); // Cheek to cheek
+    const faceHeight = getDist(10, 152); // Forehead to chin
+    const eyeDist = getDist(33, 263);    // Outer eye corners
+    const noseLength = getDist(1, 2);    // Nose bridge
+    const mouthWidth = getDist(61, 291); // Lip corners
+
+    return [
+        eyeDist / faceWidth,
+        noseLength / faceHeight,
+        mouthWidth / faceWidth,
+        eyeDist / faceHeight
+    ];
+}
+
 function processBiometricAuth(landmarks) {
-    const elapsed = Date.now() - scanStartTime;
+    if (isSubjectAuthorized || enrollmentMode) return;
 
-    if (elapsed < 3000) {
-        updateSecurityStatus('IDENTIFYING...', 'SCANNING NEURAL MESH - ' + Math.floor((elapsed / 3000) * 100) + '%');
+    const currentSignature = calculateFaceSignature(landmarks);
+    const label = document.getElementById('subjectLabel');
+
+    // 1. Identify Subject
+    let bestMatch = null;
+    let minDistance = 0.05; // Tight threshold for recognition
+
+    subjects.forEach(subject => {
+        const distance = Math.sqrt(
+            subject.signature.reduce((acc, val, i) => acc + Math.pow(val - currentSignature[i], 2), 0)
+        );
+
+        if (distance < minDistance) {
+            minDistance = distance;
+            bestMatch = subject;
+        }
+    });
+
+    if (bestMatch) {
+        if (label) label.textContent = bestMatch.name.toUpperCase();
+        authorizeSubject(bestMatch.name);
     } else {
-        // AI Logic: First time = Unknown, Subsequent = Recognized.
-        // For simulation, we'll "recognize" if we hold still for 3 seconds.
-        // But the user requested enrollment for unknown people.
+        if (label) label.textContent = 'UNKNOWN';
+        const elapsed = Date.now() - scanStartTime;
 
-        const hasStoredIdentity = localStorage.getItem('jarvis_face_enrolled') === 'true';
-
-        if (hasStoredIdentity) {
-            authorizeSubject();
+        if (elapsed < 4000) {
+            updateSecurityStatus('IDENTIFYING...', 'SCANNING NEURAL MESH - ' + Math.floor((elapsed / 4000) * 100) + '%');
         } else {
             initiateEnrollment();
         }
     }
 }
 
-function authorizeSubject() {
+function authorizeSubject(name) {
     isSubjectAuthorized = true;
+    securityOverlay.classList.remove('unauthorized');
     securityOverlay.classList.add('authorized');
-    updateSecurityStatus('AUTHORIZED', 'IDENTIFIED: SUBJECT 001 - ADITYA');
+    updateSecurityStatus('AUTHORIZED', `WELCOME HOME, ${name.toUpperCase()}`);
 
-    speak("Biometric match confirmed. Welcome back, Aditya.", false);
+    speak(`Biometric match confirmed. Welcome back, ${name}.`, false);
 
     setTimeout(() => {
         completeSystemInitialization();
@@ -233,19 +285,38 @@ function initiateEnrollment() {
     if (enrollmentMode) return;
     enrollmentMode = true;
 
-    updateSecurityStatus('UNKNOWN SUBJECT', 'SECURITY BREACH PREVENTED');
     securityOverlay.classList.add('unauthorized');
+    updateSecurityStatus('UNKNOWN SUBJECT', 'ACCESS DENIED - REGISTRATION REQUIRED');
 
-    speak("Security protocol engaged. Unknown subject detected. Please state your name to register your biometric profile.", true);
-
-    // We'll let the user "enroll" via voice in the next phase, 
-    // but for now, we'll store a mock identity after 5 seconds of "enrollment".
-    setTimeout(() => {
-        localStorage.setItem('jarvis_face_enrolled', 'true');
-        speak("Biometric profile successfully registered. Access granted.", true);
-        authorizeSubject();
-    }, 6000);
+    document.getElementById('enrollmentForm').style.display = 'block';
+    speak("Identity not found in database. Please register your profile to proceed.", true);
 }
+
+// Enrollment Capture
+function registerNewSubject() {
+    const nameInput = document.getElementById('userNameInput');
+    const name = nameInput.value.trim();
+
+    if (!name) {
+        speak("Please enter a valid identification name, sir.", false);
+        return;
+    }
+
+    // Get current frame landmarks
+    // We already have a logic to send images to faceMesh. 
+    // We'll use the last detected landmarks which are available globally or we can trigger a manual scan.
+    // For this implementation, we assume the user is still in front of the camera.
+
+    // We need to capture the current signature from the last valid frame
+    // Since we don't store landmarks globally, we'll do it on the next frame result.
+
+    enrollmentMode = "capturing"; // Special state to trigger save on next frame
+    currentEnrollmentName = name;
+}
+
+let currentEnrollmentName = "";
+
+// Helper for enrollment in onVisionResults (needs update to the results handler)
 
 function updateSecurityStatus(tag, detail) {
     const tagEl = securityStatus.querySelector('.status-tag');
@@ -510,6 +581,12 @@ function setupEventListeners() {
         scanStartTime = Date.now();
         camera.start();
     });
+
+    // Enrollment Form
+    const registerBtn = document.getElementById('registerBtn');
+    if (registerBtn) {
+        registerBtn.addEventListener('click', registerNewSubject);
+    }
 }
 
 // Start

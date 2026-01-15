@@ -44,10 +44,20 @@
             <div class="scan-reticle"></div>
             <video id="faceVideo" autoplay playsinline></video>
             <canvas id="faceOverlay"></canvas>
+            <div id="subjectLabel" class="subject-label">UNKNOWN</div>
         </div>
         <div class="security-status" id="securityStatus">
             <div class="status-tag">IDENTIFYING...</div>
             <div class="status-detail">SCANNING BIOMETRIC DATA MESH</div>
+        </div>
+
+        <!-- Enrollment Form (Initially Hidden) -->
+        <div id="enrollmentForm" class="security-form" style="display: none;">
+            <p>NAME NOT IN DATABASE. PLEASE REGISTER SUBJECT.</p>
+            <div class="form-group">
+                <input type="text" id="userNameInput" placeholder="ENTER SUBJECT NAME..." autocomplete="off">
+                <button id="registerBtn" class="register-btn">REGISTER</button>
+            </div>
         </div>
     </div>
 
