@@ -157,7 +157,20 @@ function init() {
 // ============================================
 
 // Biometric Database
-let subjects = JSON.parse(localStorage.getItem('jarvis_subjects') || '[]');
+// Biometric Database
+let subjects = [];
+try {
+    subjects = JSON.parse(localStorage.getItem('jarvis_subjects') || '[]');
+    // Validate schema - if signature length matches new algo (10)
+    if (subjects.length > 0 && subjects[0].signature.length < 10) {
+        console.warn('⚠️ Legacy biometric data detected. Purging old profiles.');
+        subjects = [];
+        localStorage.removeItem('jarvis_subjects');
+    }
+} catch (e) {
+    console.error('❌ Error loading biometric database:', e);
+    subjects = [];
+}
 
 async function setupVisionSystem() {
     console.log('👁️ Initializing Vision System (MediaPipe)...');
@@ -202,16 +215,31 @@ function onVisionResults(results) {
 
         // Enrollment Capture Trigger
         if (enrollmentMode === "capturing") {
-            const signature = calculateFaceSignature(landmarks);
-            subjects.push({ name: currentEnrollmentName, signature: signature });
-            localStorage.setItem('jarvis_subjects', JSON.stringify(subjects));
+            try {
+                const signature = calculateFaceSignature(landmarks);
 
-            enrollmentMode = false;
-            currentEnrollmentName = "";
-            document.getElementById('enrollmentForm').style.display = 'none';
+                // Add new subject
+                subjects.push({
+                    name: currentEnrollmentName,
+                    signature: signature,
+                    enrolledAt: Date.now()
+                });
 
-            speak(`Biometric profile for ${subjects[subjects.length - 1].name} successfully registered. Access granted.`, true);
-            authorizeSubject(subjects[subjects.length - 1].name);
+                // Save to LocalStorage
+                localStorage.setItem('jarvis_subjects', JSON.stringify(subjects));
+                console.log(`✅ Biometric profile saved for: ${currentEnrollmentName}`);
+
+                enrollmentMode = false;
+                currentEnrollmentName = "";
+                document.getElementById('enrollmentForm').style.display = 'none';
+
+                speak(`Biometric profile for ${subjects[subjects.length - 1].name} successfully registered. Access granted.`, true);
+                authorizeSubject(subjects[subjects.length - 1].name);
+            } catch (e) {
+                console.error("❌ Enrollment failed:", e);
+                speak("Error saving biometric profile. Please try again.", false);
+                enrollmentMode = false;
+            }
             return;
         }
 
