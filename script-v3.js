@@ -644,19 +644,23 @@ function togglePersona() {
 
     // Update UI
     const btn = document.getElementById('personaToggle');
-    btn.querySelector('.persona-icon').textContent = data.icon;
-    btn.querySelector('.persona-name').textContent = data.name;
+    const icon = btn.querySelector('.persona-icon');
 
+    // Swap SVG paths - Male profile vs Female profile
     if (currentPersona === 'FRIDAY') {
+        icon.innerHTML = `<circle cx="12" cy="8" r="5"/><path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/><path d="M8 8c0 0 1-2 4-2s4 2 4 2"/>`;
         btn.classList.add('friday');
     } else {
+        icon.innerHTML = `<circle cx="12" cy="8" r="5"/><path d="M3 21v-2a7 7 0 0 1 7-7h4a7 7 0 0 1 7 7v2"/>`;
         btn.classList.remove('friday');
     }
+
+    btn.querySelector('.persona-name').textContent = data.name;
 
     // Update Internal Logic
     JARVIS_SYSTEM_PROMPT = data.systemPrompt;
 
-    // Cosmetic update to root colors if desired
+    // Cosmetic update to root colors
     document.documentElement.style.setProperty('--accent', data.color);
 
     speak(`Persona switched to ${data.name}. Systems re-routing.`, false);
