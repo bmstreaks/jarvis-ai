@@ -1360,25 +1360,35 @@ body {
     background: rgba(0, 212, 255, 0.1);
     border: 1px solid var(--accent);
     color: var(--accent);
-    padding: 8px 15px;
+    padding: 6px 12px;
     font-family: 'Orbitron', sans-serif;
-    font-size: 11px;
-    display: flex;
+    font-size: 10px;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     cursor: pointer;
     transition: all 0.3s ease;
     border-radius: 4px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
     position: relative;
     z-index: 100;
+    width: fit-content;
+    max-width: 120px;
+    flex-shrink: 0;
 }
 
 .voice-persona-btn .persona-icon {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
+    min-width: 16px;
+    min-height: 16px;
+    flex-shrink: 0;
+}
+
+.voice-persona-btn .persona-name {
+    white-space: nowrap;
 }
 
 .voice-persona-btn:hover {
