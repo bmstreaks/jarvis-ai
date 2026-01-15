@@ -69,6 +69,8 @@ const WAKE_WORDS = ['jarvis', 'jarvis.', 'jarvis,', 'hey jarvis', 'ok jarvis', '
 // Speech Synthesis
 const synth = window.speechSynthesis;
 let jarvisVoice = null;
+let fridayVoice = null;
+let currentPersona = 'JARVIS'; // Toggle: JARVIS / FRIDAY
 let voicesLoaded = false;
 
 // Microphone Level Monitoring
@@ -83,15 +85,32 @@ const LOCAL_AI_URL = 'http://192.168.29.22:5000/v1/chat/completions';
 const LOCAL_AI_MODEL = 'microsoft_fara-7b';
 
 // JARVIS Responses
-const jarvisResponses = {
-    greeting: ["Good day, sir. How may I assist you today?", "Welcome back. I've been expecting you."],
-    wakeResponse: ["Yes, sir?", "At your service.", "I'm listening, sir."],
-    time: ["The current time is {time}.", "It is currently {time}, sir."],
-    status: ["All systems nominal. Vision sensors active. Biometric gate operational."],
-    unknown: ["I didn't quite catch that, sir.", "Apologies, sir. Could you repeat?"]
+const personaData = {
+    JARVIS: {
+        name: 'JARVIS',
+        icon: '🤖',
+        color: '#00d4ff',
+        systemPrompt: 'You are J.A.R.V.I.S., the polite, British-accented assistant from Iron Man. Address the user as "sir". Keep it concise and sophisticated.',
+        responses: {
+            greeting: ["Good day, sir. How may I assist you today?", "Welcome back. I've been expecting you."],
+            wakeResponse: ["Yes, sir?", "At your service.", "I'm listening, sir."],
+            unknown: ["I didn't quite catch that, sir.", "Apologies, sir. Could you repeat?"]
+        }
+    },
+    FRIDAY: {
+        name: 'FRIDAY',
+        icon: '👩‍💻',
+        color: '#ff00ff',
+        systemPrompt: 'You are F.R.I.D.A.Y., the soft-spoken, polite, and efficient British female assistant from Iron Man. Address the user as "sir". Keep it concise and sophisticated.',
+        responses: {
+            greeting: ["Good evening, sir. Boss? How can I help?", "F.R.I.D.A.Y. online. What's the plan, sir?"],
+            wakeResponse: ["Yes, Boss?", "Listening.", "Always here, sir."],
+            unknown: ["Sorry sir, could you say that again?", "I missed that. Repeat?"]
+        }
+    }
 };
 
-const JARVIS_SYSTEM_PROMPT = `You are J.A.R.V.I.S., the polite, British-accented assistant from Iron Man. Address the user as "sir". Keep it concise and sophisticated.`;
+let JARVIS_SYSTEM_PROMPT = personaData.JARVIS.systemPrompt;
 
 // ============================================
 // INITIALIZATION
@@ -438,7 +457,14 @@ function speak(text, addToLog = true) {
     try { recognition.stop(); } catch (e) { }
 
     const utterance = new SpeechSynthesisUtterance(text);
-    if (jarvisVoice) utterance.voice = jarvisVoice;
+
+    // Select voice based on persona
+    if (currentPersona === 'FRIDAY' && fridayVoice) {
+        utterance.voice = fridayVoice;
+    } else if (jarvisVoice) {
+        utterance.voice = jarvisVoice;
+    }
+
     utterance.rate = 0.95;
 
     utterance.onstart = () => {
@@ -457,7 +483,7 @@ function speak(text, addToLog = true) {
     synth.cancel();
     synth.speak(utterance);
 
-    if (addToLog) addToChatLog('JARVIS', text);
+    if (addToLog) addToChatLog(currentPersona, text);
     responseText.textContent = text;
 }
 
@@ -545,7 +571,24 @@ async function updateSystemInfo() {
 
 function setupSpeechSynthesis() {
     const voices = synth.getVoices();
-    jarvisVoice = voices.find(v => v.name.includes('Google UK English Male')) || voices[0];
+    if (voices.length === 0) {
+        // Retry if voices aren't loaded yet (some browsers)
+        setTimeout(setupSpeechSynthesis, 100);
+        return;
+    }
+
+    // Improved voice selection
+    jarvisVoice = voices.find(v => v.name.includes('Google UK English Male')) ||
+        voices.find(v => v.name.includes('Male') && v.lang.includes('en-GB')) ||
+        voices[0];
+
+    fridayVoice = voices.find(v => v.name.includes('Google UK English Female')) ||
+        voices.find(v => v.name.includes('Female') && v.lang.includes('en-GB')) ||
+        voices.find(v => v.name.includes('Hazel')) ||
+        voices[0];
+
+    voicesLoaded = true;
+    console.log('🎙️ Voices Initialized:', { jarvis: jarvisVoice?.name, friday: fridayVoice?.name });
 }
 
 async function setupMicLevelMonitor() {
@@ -587,6 +630,36 @@ function setupEventListeners() {
     if (registerBtn) {
         registerBtn.addEventListener('click', registerNewSubject);
     }
+
+    // Persona Toggle
+    const personaBtn = document.getElementById('personaToggle');
+    if (personaBtn) {
+        personaBtn.addEventListener('click', togglePersona);
+    }
+}
+
+function togglePersona() {
+    currentPersona = (currentPersona === 'JARVIS') ? 'FRIDAY' : 'JARVIS';
+    const data = personaData[currentPersona];
+
+    // Update UI
+    const btn = document.getElementById('personaToggle');
+    btn.querySelector('.persona-icon').textContent = data.icon;
+    btn.querySelector('.persona-name').textContent = data.name;
+
+    if (currentPersona === 'FRIDAY') {
+        btn.classList.add('friday');
+    } else {
+        btn.classList.remove('friday');
+    }
+
+    // Update Internal Logic
+    JARVIS_SYSTEM_PROMPT = data.systemPrompt;
+
+    // Cosmetic update to root colors if desired
+    document.documentElement.style.setProperty('--accent', data.color);
+
+    speak(`Persona switched to ${data.name}. Systems re-routing.`, false);
 }
 
 // Start
