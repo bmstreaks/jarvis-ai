@@ -668,3 +668,6 @@ function togglePersona() {
 
 // Start
 document.addEventListener('DOMContentLoaded', init);
+
+// Expose to global scope for onclick handlers (ES Modules don't expose by default)
+window.togglePersona = togglePersona;
