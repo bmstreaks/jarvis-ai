@@ -631,11 +631,7 @@ function setupEventListeners() {
         registerBtn.addEventListener('click', registerNewSubject);
     }
 
-    // Persona Toggle
-    const personaBtn = document.getElementById('personaToggle');
-    if (personaBtn) {
-        personaBtn.addEventListener('click', togglePersona);
-    }
+    // Persona Toggle is handled via onclick="window.togglePersona()" in HTML
 }
 
 function togglePersona() {
