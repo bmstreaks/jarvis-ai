@@ -1,0 +1,27 @@
+{
+    "hosting": {
+        "public": ".",
+        "ignore": [
+            "firebase.json",
+            "firebase-debug.log",
+            "**/.*",
+            "node_modules/**",
+            "**/node_modules/**",
+            ".venv/**",
+            "**/.venv/**",
+            "*.py",
+            "*.txt",
+            "package.json",
+            "package-lock.json",
+            "test_audio.py",
+            "audio_deep_debug.py",
+            "audio_log.txt"
+        ],
+        "rewrites": [
+            {
+                "source": "**",
+                "destination": "/index.html"
+            }
+        ]
+    }
+}
