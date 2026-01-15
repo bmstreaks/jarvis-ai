@@ -84,13 +84,21 @@ let micLevelText = document.getElementById('micLevelText');
 const LOCAL_AI_URL = 'http://192.168.29.22:5000/v1/chat/completions';
 const LOCAL_AI_MODEL = 'microsoft_fara-7b';
 
-// JARVIS Responses
+// Persona Data with full theme colors
 const personaData = {
     JARVIS: {
         name: 'JARVIS',
-        icon: '🤖',
-        color: '#00d4ff',
         systemPrompt: 'You are J.A.R.V.I.S., the polite, British-accented assistant from Iron Man. Address the user as "sir". Keep it concise and sophisticated.',
+        theme: {
+            primaryCyan: '#00d4ff',
+            primaryBlue: '#0077ff',
+            accentCyan: '#00f7ff',
+            glowCyan: 'rgba(0, 212, 255, 0.6)',
+            panelBg: 'rgba(0, 20, 40, 0.7)',
+            panelBorder: 'rgba(0, 212, 255, 0.3)',
+            textPrimary: '#e0f7ff',
+            textSecondary: '#7eb8c9'
+        },
         responses: {
             greeting: ["Good day, sir. How may I assist you today?", "Welcome back. I've been expecting you."],
             wakeResponse: ["Yes, sir?", "At your service.", "I'm listening, sir."],
@@ -99,9 +107,17 @@ const personaData = {
     },
     FRIDAY: {
         name: 'FRIDAY',
-        icon: '👩‍💻',
-        color: '#ff00ff',
         systemPrompt: 'You are F.R.I.D.A.Y., the soft-spoken, polite, and efficient British female assistant from Iron Man. Address the user as "sir". Keep it concise and sophisticated.',
+        theme: {
+            primaryCyan: '#ff00ff',
+            primaryBlue: '#cc00cc',
+            accentCyan: '#ff66ff',
+            glowCyan: 'rgba(255, 0, 255, 0.6)',
+            panelBg: 'rgba(40, 0, 40, 0.7)',
+            panelBorder: 'rgba(255, 0, 255, 0.3)',
+            textPrimary: '#ffe0ff',
+            textSecondary: '#c97eb8'
+        },
         responses: {
             greeting: ["Good evening, sir. Boss? How can I help?", "F.R.I.D.A.Y. online. What's the plan, sir?"],
             wakeResponse: ["Yes, Boss?", "Listening.", "Always here, sir."],
@@ -637,17 +653,18 @@ function setupEventListeners() {
 function togglePersona() {
     currentPersona = (currentPersona === 'JARVIS') ? 'FRIDAY' : 'JARVIS';
     const data = personaData[currentPersona];
+    const theme = data.theme;
 
-    // Update UI
+    // Update UI Button
     const btn = document.getElementById('personaToggle');
     const icon = btn.querySelector('.persona-icon');
 
-    // Swap SVG paths - Male profile vs Female profile
+    // Swap SVG - Arc reactor with different glow colors
     if (currentPersona === 'FRIDAY') {
-        icon.innerHTML = `<circle cx="12" cy="8" r="5"/><path d="M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2"/><path d="M8 8c0 0 1-2 4-2s4 2 4 2"/>`;
+        icon.innerHTML = `<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>`;
         btn.classList.add('friday');
     } else {
-        icon.innerHTML = `<circle cx="12" cy="8" r="5"/><path d="M3 21v-2a7 7 0 0 1 7-7h4a7 7 0 0 1 7 7v2"/>`;
+        icon.innerHTML = `<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>`;
         btn.classList.remove('friday');
     }
 
@@ -656,8 +673,16 @@ function togglePersona() {
     // Update Internal Logic
     JARVIS_SYSTEM_PROMPT = data.systemPrompt;
 
-    // Cosmetic update to root colors
-    document.documentElement.style.setProperty('--accent', data.color);
+    // Apply FULL Theme Color Transformation
+    const root = document.documentElement;
+    root.style.setProperty('--primary-cyan', theme.primaryCyan);
+    root.style.setProperty('--primary-blue', theme.primaryBlue);
+    root.style.setProperty('--accent-cyan', theme.accentCyan);
+    root.style.setProperty('--glow-cyan', theme.glowCyan);
+    root.style.setProperty('--panel-bg', theme.panelBg);
+    root.style.setProperty('--panel-border', theme.panelBorder);
+    root.style.setProperty('--text-primary', theme.textPrimary);
+    root.style.setProperty('--text-secondary', theme.textSecondary);
 
     speak(`Persona switched to ${data.name}. Systems re-routing.`, false);
 }
