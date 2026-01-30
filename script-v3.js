@@ -157,7 +157,20 @@ function init() {
 // ============================================
 
 // Biometric Database
-let subjects = JSON.parse(localStorage.getItem('jarvis_subjects') || '[]');
+// Biometric Database
+let subjects = [];
+try {
+    subjects = JSON.parse(localStorage.getItem('jarvis_subjects') || '[]');
+    // Validate schema - if signature length matches new algo (10)
+    if (subjects.length > 0 && subjects[0].signature.length < 10) {
+        console.warn('⚠️ Legacy biometric data detected. Purging old profiles.');
+        subjects = [];
+        localStorage.removeItem('jarvis_subjects');
+    }
+} catch (e) {
+    console.error('❌ Error loading biometric database:', e);
+    subjects = [];
+}
 
 async function setupVisionSystem() {
     console.log('👁️ Initializing Vision System (MediaPipe)...');
@@ -202,16 +215,31 @@ function onVisionResults(results) {
 
         // Enrollment Capture Trigger
         if (enrollmentMode === "capturing") {
-            const signature = calculateFaceSignature(landmarks);
-            subjects.push({ name: currentEnrollmentName, signature: signature });
-            localStorage.setItem('jarvis_subjects', JSON.stringify(subjects));
+            try {
+                const signature = calculateFaceSignature(landmarks);
 
-            enrollmentMode = false;
-            currentEnrollmentName = "";
-            document.getElementById('enrollmentForm').style.display = 'none';
+                // Add new subject
+                subjects.push({
+                    name: currentEnrollmentName,
+                    signature: signature,
+                    enrolledAt: Date.now()
+                });
 
-            speak(`Biometric profile for ${subjects[subjects.length - 1].name} successfully registered. Access granted.`, true);
-            authorizeSubject(subjects[subjects.length - 1].name);
+                // Save to LocalStorage
+                localStorage.setItem('jarvis_subjects', JSON.stringify(subjects));
+                console.log(`✅ Biometric profile saved for: ${currentEnrollmentName}`);
+
+                enrollmentMode = false;
+                currentEnrollmentName = "";
+                document.getElementById('enrollmentForm').style.display = 'none';
+
+                speak(`Biometric profile for ${subjects[subjects.length - 1].name} successfully registered. Access granted.`, true);
+                authorizeSubject(subjects[subjects.length - 1].name);
+            } catch (e) {
+                console.error("❌ Enrollment failed:", e);
+                speak("Error saving biometric profile. Please try again.", false);
+                enrollmentMode = false;
+            }
             return;
         }
 
@@ -219,7 +247,9 @@ function onVisionResults(results) {
             processBiometricAuth(landmarks);
         }
     } else {
+        // No face detected - RESET the scan timer
         if (securityOverlay.classList.contains('active')) {
+            scanStartTime = Date.now(); // Reset timer so it doesn't auto-enroll
             updateSecurityStatus('LOST SIGNAL', 'PLEASE POSITION FACE WITHIN RETICLE');
             const label = document.getElementById('subjectLabel');
             if (label) label.textContent = 'NO SIGNAL';
@@ -247,23 +277,38 @@ function drawFaceMeshHUD(landmarks) {
 
 /**
  * Generates a scale-invariant biometric signature based on facial ratios
+ * Using multiple ratios for better differentiation between faces
  */
 function calculateFaceSignature(landmarks) {
-    // We use ratios of distances between key landmarks
-    // e.g. Eye distance / Face width, Nose length / Face height
-    const getDist = (a, b) => Math.sqrt(Math.pow(landmarks[a].x - landmarks[b].x, 2) + Math.pow(landmarks[a].y - landmarks[b].y, 2));
+    const getDist = (a, b) => Math.sqrt(
+        Math.pow(landmarks[a].x - landmarks[b].x, 2) +
+        Math.pow(landmarks[a].y - landmarks[b].y, 2)
+    );
 
-    const faceWidth = getDist(234, 454); // Cheek to cheek
-    const faceHeight = getDist(10, 152); // Forehead to chin
-    const eyeDist = getDist(33, 263);    // Outer eye corners
-    const noseLength = getDist(1, 2);    // Nose bridge
-    const mouthWidth = getDist(61, 291); // Lip corners
+    // Key distances
+    const faceWidth = getDist(234, 454);     // Cheek to cheek
+    const faceHeight = getDist(10, 152);     // Forehead to chin
+    const eyeDistOuter = getDist(33, 263);   // Outer eye corners
+    const eyeDistInner = getDist(133, 362);  // Inner eye corners
+    const noseWidth = getDist(48, 278);      // Nose width
+    const noseLength = getDist(6, 4);        // Nose bridge to tip
+    const mouthWidth = getDist(61, 291);     // Lip corners
+    const lipHeight = getDist(13, 14);       // Upper to lower lip
+    const jawWidth = getDist(172, 397);      // Jawline width
+    const foreheadToNose = getDist(10, 6);   // Forehead to nose bridge
 
+    // Return array of scale-invariant ratios
     return [
-        eyeDist / faceWidth,
+        eyeDistOuter / faceWidth,
+        eyeDistInner / faceWidth,
+        noseWidth / faceWidth,
         noseLength / faceHeight,
         mouthWidth / faceWidth,
-        eyeDist / faceHeight
+        lipHeight / faceHeight,
+        jawWidth / faceWidth,
+        foreheadToNose / faceHeight,
+        eyeDistOuter / eyeDistInner,  // Eye shape ratio
+        mouthWidth / noseWidth        // Mouth to nose ratio
     ];
 }
 
@@ -275,7 +320,7 @@ function processBiometricAuth(landmarks) {
 
     // 1. Identify Subject
     let bestMatch = null;
-    let minDistance = 0.05; // Tight threshold for recognition
+    let minDistance = 0.15; // Adjusted threshold for more reliable recognition
 
     subjects.forEach(subject => {
         const distance = Math.sqrt(
