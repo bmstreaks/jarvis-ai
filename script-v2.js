@@ -65,8 +65,8 @@ let micLevelBar = null;
 let micLevelText = null;
 
 // Gemini AI Configuration
-const GEMINI_API_KEY = 'AIzaSyBPDLLbVph612-5cbws77b4WDkpRNpSyBE';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GEMINI_API_KEY = ;
+const GEMINI_API_URL = '';
 
 // System prompt for JARVIS personality
 const JARVIS_SYSTEM_PROMPT = `You are J.A.R.V.I.S. (Just A Rather Very Intelligent System), the AI assistant from Iron Man. 
